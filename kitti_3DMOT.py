@@ -54,10 +54,7 @@ def track_one_seq(seq_id,config):
 
     return dataset, tracker, all_time, frame_num
 
-def save_one_seq(dataset,
-                 seq_id,
-                 tracker,
-                 config):
+def save_one_seq(dataset, seq_id, tracker, config):
     """
     saving tracking results
     Args:
@@ -122,7 +119,6 @@ def save_one_seq(dataset,
                              box2d[0][3],box[5],box[4],box[3],box[0],box[1],box[2],box[6],score),file = f)
     return proc_time
 
-
 def tracking_val_seq(arg):
 
     yaml_file = arg.cfg_file
@@ -161,7 +157,7 @@ def tracking_val_seq(arg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='arg parser')
-    parser.add_argument('--cfg_file', type=str, default="config/global/second_iou_mot.yaml",
+    parser.add_argument('--cfg_file', type=str, default="config/online/pvrcnn_mot.yaml",
                         help='specify the config for tracking')
     args = parser.parse_args()
     tracking_val_seq(args)

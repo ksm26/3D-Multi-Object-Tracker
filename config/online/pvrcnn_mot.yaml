@@ -1,5 +1,5 @@
 # dataset info
-dataset_path: "F:/data/tracking/training"
+dataset_path: "kitti_tracking/training"
 detections_path: "data/pvrcnn/training"
 save_path: 'evaluation/results/sha_key/data'
 
@@ -11,7 +11,7 @@ tracking_seqs: [1,6,8,10,12,13,14,15,16,18,19]
 # tracking type
 tracking_type: "Car"
 
-# KF parameters
+# Kalman Filter parameters
 state_func_covariance: 100
 measure_func_covariance: 0.001
 prediction_score_decay: 0.03
@@ -23,7 +23,7 @@ max_prediction_num_for_new_object: 2
 
 # detection score threshold
 input_score: 0
-init_score: 2
+init_score: 2 
 update_score: 0
 post_score: 0
 
