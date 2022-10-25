@@ -70,6 +70,7 @@ class nuscenesTrackingDataset:
         # lidar_pose = self.nusc.get('calibrated_sensor', LIDAR_data['calibrated_sensor_token'])
         pose = transform_matrix(ego_pose['translation'], Quaternion(ego_pose['rotation']),
                                 inverse=True)
+        pose_angle = Quaternion(ego_pose['rotation']).yaw_pitch_roll[0]
 
         if self.ob_path is not None:
             ob_path = os.path.join(self.ob_path, name + '.txt')
@@ -84,7 +85,7 @@ class nuscenesTrackingDataset:
                         infos = re.split(' ', each_ob)
                         if infos[0] in self.type:
                             angle_quaternion = Quaternion(infos[7:11])
-                            objects_list.append(infos[1:7] + [angle_quaternion .yaw_pitch_roll[0]])
+                            objects_list.append(infos[1:7] + [angle_quaternion.yaw_pitch_roll[0]])
                             det_scores.append(infos[11])
                 if len(objects_list)!=0:
                     objects = np.array(objects_list,np.float32)
@@ -103,5 +104,16 @@ class nuscenesTrackingDataset:
         #     #camera_intrinsic
         #     _, _, self.P2 = self.nusc.get_sample_data(cam_front_data['ego_pose_token'])
 
+        nuscenes_data = {'camera_intrinsic':self.camera_intrinsic,
+                        'Ego2Cam':self.Ego2Cam,
+                        'points':points,
+                        'image':image,
+                        'objects':objects,
+                        'det_scores':det_scores,
+                        'pose':pose,
+                        'lidar_sensor_pose':lidar_sensor_pose,
+                         'pose_angle':pose_angle,
+                         }
 
-        return self.camera_intrinsic,self.Ego2Cam,points,image,objects,det_scores,pose,lidar_sensor_pose
+
+        return nuscenes_data
