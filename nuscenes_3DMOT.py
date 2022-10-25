@@ -16,7 +16,7 @@ from nuscenes import NuScenes
 from nuscenes.eval.common.loaders import load_prediction, load_gt, add_center_dist, filter_eval_boxes
 from nuscenes.eval.tracking.data_classes import TrackingMetrics, TrackingMetricDataList, TrackingConfig, TrackingBox, \
     TrackingMetricData
-from nuscenes.utils.data_classes import LidarPointCloud
+from nuscenes.utils.data_classes import LidarPointCloud,Box
 from pyquaternion import Quaternion
 
 
@@ -36,81 +36,6 @@ def rotate(center, quaternion: Quaternion) -> None:
     center = np.dot(quaternion.rotation_matrix, center)
     # orientation = quaternion * self.orientation
 
-def track_one_seq_prev(seq_id,config):
-
-    """
-    tracking one sequence
-    Args:
-        seq_id: int, the sequence id
-        config: config
-    Returns: dataset: KittiTrackingDataset
-             tracker: Tracker3D
-             all_time: float, all tracking time
-             frame_num: int, num frames
-    """
-    dataset_path = config.dataset_path
-    detections_path = config.detections_path
-    tracking_type = config.tracking_type
-    detections_path += "/" + str(seq_id).zfill(4)
-    verbose = config.verbose
-
-    nusc = NuScenes(version=config.nusc_version, verbose=verbose, dataroot=dataset_path)
-
-    for i in range(10):
-        my_scene = nusc.scene[i]
-        first_token = my_scene['first_sample_token']
-        last_token = my_scene['last_sample_token']
-        nbr_samples = my_scene['nbr_samples']
-        current_token = first_token
-        for i in range(nbr_samples):
-            current_sample = nusc.get('sample', current_token)
-            # file_idx = scene_token_list_timestamps[current_token][0]
-            # file_name = os.path.join('/media/storage/nuscenes_labels_new', str(scene_name), str(file_idx) + '.txt')
-            LIDAR_data = nusc.get('sample_data', current_sample['data']['LIDAR_TOP'])
-            if config.load_data == "True":
-                # nusc.render_sample_data(cam_front_data['token'])
-                pcl_path = os.path.join(config.dataset_path, LIDAR_data['filename'])
-                lidar_pcl = LidarPointCloud.from_file(pcl_path)
-
-            ego_pose = nusc.get('ego_pose', LIDAR_data['ego_pose_token'])
-            pose = transform_matrix(ego_pose['translation'], Quaternion(ego_pose['rotation']),
-                                       inverse=False)
-            next_token = current_sample['next']
-            current_token = next_token
-
-
-    # Load data.
-    if verbose:
-        print('Initializing nuScenes tracking evaluation')
-    pred_boxes, self.meta = load_prediction(self.result_path, self.cfg.max_boxes_per_sample, TrackingBox,
-                                            verbose=verbose)
-    gt_boxes = load_gt(nusc, self.eval_set, TrackingBox, verbose=verbose)
-
-    # tracker = Tracker3D(box_type="Kitti", tracking_features=False, config = config)
-    # dataset = KittiTrackingDataset(dataset_path, seq_id=seq_id, ob_path=detections_path,type=[tracking_type])
-
-    all_time = 0
-    frame_num = 0
-
-    for i in range(len(dataset)):
-        P2, V2C, points, image, objects, det_scores, pose = dataset[i]
-
-        mask = det_scores>config.input_score
-        objects = objects[mask]
-        det_scores = det_scores[mask]
-
-        start = time.time()
-
-        tracker.tracking(objects[:,:7],
-                             features=None,
-                             scores=det_scores,
-                             pose=pose,
-                             timestamp=i)
-        end = time.time()
-        all_time+=end-start
-        frame_num+=1
-
-    return dataset, tracker, all_time, frame_num
 
 def track_one_seq(seq_id,config,nusc,my_scene):
 
@@ -144,19 +69,19 @@ def track_one_seq(seq_id,config,nusc,my_scene):
 
     for i in range(nbr_samples):
         current_sample = nusc.get('sample', current_token)
-        camera_intrinsic, Ego2Cam, points, image, objects, det_scores, pose,_ = dataset[my_scene,current_token,current_sample]
+        nuscenes_data  = dataset[my_scene,current_token,current_sample]
         next_token = current_sample['next']
         current_token = next_token
-        mask = det_scores > config.input_score
-        objects = objects[mask]
-        det_scores = det_scores[mask]
+        mask = nuscenes_data['det_scores'] > config.input_score
+        objects = nuscenes_data['objects'][mask]
+        det_scores = nuscenes_data['det_scores'][mask]
 
         start = time.time()
 
         #TODO Reset this after every scene
-        tracker.tracking(objects[:, :7],
+        tracker.tracking(nuscenes_data['objects'][:, :7],
                          features=None,
-                         scores=det_scores,
+                         scores=nuscenes_data['det_scores'],
                          pose=None,
                          timestamp=i)
         end = time.time()
@@ -218,10 +143,17 @@ def save_one_seq(dataset,
     with open(save_name,'w+') as f:
         for i in range(nbr_samples):
             current_sample = nusc.get('sample', current_token)
-            camera_intrinsic, Ego2Cam, points, image, _, _, pose,lidar_sensor_pose = dataset[my_scene,current_token,current_sample]
-            new_pose = np.mat(pose).I
+            nuscenes_data = dataset[my_scene,current_token,current_sample]
+            # pose_matrix = Quaternion(pose['rotation'].inverse).rotation_matrix
             next_token = current_sample['next']
             current_token = next_token
+
+            #####test script
+            angle = Quaternion([0.983, 0, 0, -0.183])
+            box_chk = Box(center=[60.83, -18.29, 1.00], size=[0.62, 0.67, 1.64], orientation=angle)
+            box_info = list(box_chk.center) + list(box_chk.wlh) + [box_chk.orientation.yaw_pitch_roll[0]]
+            corners_3d = box_chk.corners()
+            ##########
 
             if i in frame_first_dict.keys():
                 objects = frame_first_dict[i]
@@ -233,23 +165,29 @@ def save_one_seq(dataset,
                     box_template[0,0:3]=updated_state[0,0:3]
                     box_template[0,3:7]=updated_state[0,9:13]
 
-                    box = register_bbs(box_template,new_pose)
-
-                    box[:, 6] = -box[:, 6] - np.pi / 2
-                    box[:, 2] -= box[:, 5] / 2
-                    # box[:,0:3] = velo_to_cam(box[:,0:3],V2C)[:,0:3]
+                    ##
+                    # sensor = 'CAM_FRONT'
+                    # cam_front_data = nusc.get('sample_data', current_sample['data'][sensor])
+                    # nusc.render_sample_data(cam_front_data['token'])
+                    ##
 
                     #global to ego-vehicle
-                    np.matmul(pose,xyz)
+                    box = bb3d_corners_nuscenes(list(box_template[0,:]))
+                    corners_ego= np.dot(nuscenes_data['pose'] , box)
+                    corners_camera = np.dot(nuscenes_data['Ego2Cam'], corners_ego)
+                    box2d = view_points(corners_camera[:3, :], nuscenes_data['camera_intrinsic'], normalize=True)
                     #ego to calibrate sensor
-                    np.matmul(lidar_sensor_pose, xyz)
-
-
-                    box2d = view_points(bb3d_corners_nuscenes(box)[:,:3].T, P2, normalize=True)
+                    transformed_corners_lidar = np.dot(nuscenes_data['lidar_sensor_pose'] , corners_ego)
+                    box_center = bb3d_centres_nuscenes(transformed_corners_lidar)
+                    box_angle = nuscenes_data['pose_angle']-box_template[0][6]
 
                     print('%d %d %s -1 -1 -10 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
-                          % (i,ob_id,tracking_type,box2d[0][0],box2d[0][1],box2d[0][2],
-                             box2d[0][3],box[5],box[4],box[3],box[0],box[1],box[2],box[6],score),file = f)
+                          % (i, ob_id, tracking_type, box2d[0][0], box2d[0][1], box2d[0][2],
+                             box2d[0][3], box_center[0], box_center[1], box_center[2], box_template[0][3], box_template[0][4], box_template[0][5], box_angle, score), file=f)
+
+                    # print('%d %d %s -1 -1 -10 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
+                    #       % (i,ob_id,tracking_type,box2d[0][0],box2d[0][1],box2d[0][2],
+                    #          box2d[0][3],box[5],box[4],box[3],box[0],box[1],box[2],box[6],score),file = f)
 
     return proc_time
 
@@ -275,12 +213,12 @@ def tracking_val_seq(arg):
 
     all_time,frame_num = 0,0
 
-    for scene_no in tqdm.trange(len(seq_list)):
-        current_scene = nusc.scene[scene_no]
+    for seq_id in tqdm.trange(seq_list):
+        current_scene = nusc.scene[seq_id]
 
         all_time = 0
         frame_num = 0
-        seq_id = seq_list[scene_no]
+        # seq_id = seq_list[scene_no]
         dataset,tracker, this_time, this_num = track_one_seq(seq_id,config,nusc,current_scene)
         proc_time = save_one_seq(dataset,seq_id,tracker,config,nusc,current_scene)
 
