@@ -108,3 +108,55 @@ def bb3d_2_bb2d(bb3d,P2):
     box, _ = corners3d_to_img_boxes(P2, pts[:, :, 0:3])
 
     return box
+
+def bb3d_corners_nuscenes(bb3d) -> np.ndarray:
+    """
+    Returns the bounding box corners.
+    :param wlh_factor: Multiply w, l, h by a factor to scale the box.
+    :return: <np.float: 3, 8>. First four corners are the ones facing forward.
+        The last four are the ones facing backwards.
+    """
+    x, y, z, l, w, h, yaw = bb3d[0], bb3d[1], bb3d[2], bb3d[3], bb3d[4], bb3d[5], bb3d[6]
+    # w, l, h = self.wlh * wlh_factor
+
+    # 3D bounding box corners. (Convention: x points forward, y to the left, z up.)
+    x_corners = l / 2 * np.array([1,  1,  1,  1, -1, -1, -1, -1])
+    y_corners = w / 2 * np.array([1, -1, -1,  1,  1, -1, -1,  1])
+    z_corners = h / 2 * np.array([1,  1, -1, -1,  1,  1, -1, -1])
+    homog_coord =  np.array([1, 1, 1, 1, 1, 1, 1, 1])
+    corners = np.vstack((x_corners, y_corners, z_corners,homog_coord ))
+
+    # Rotate
+    transpose = np.array([[np.cos(yaw), -np.sin(yaw), 0, x],
+                          [np.sin(yaw), np.cos(yaw), 0, y],
+                          [0, 0, 1, z],
+                          [0, 0, 0, 1]])
+    corners = np.matmul(transpose,corners)
+
+    return corners
+
+def corners_transform_nuscenes(corners,pose) -> np.ndarray:
+    """
+    Returns the bounding box corners in transformed coordinates.
+    :param corners: numpy array (3x8) of the 8 coorners of 3D bbox
+    :param:transl and rot angle of the new coordinate frame
+    :return: <np.float: 3, 8>. First four corners are the ones facing forward.
+        The last four are the ones facing backwards.
+    """
+
+    # transformed_corners = corners+pose[3,0:3]
+    # transformed_corners = np.dot(pose[0:3,0:3], corners)
+
+    transformed_corners = np.dot(pose, corners)
+
+    return transformed_corners
+
+def bb3d_centres_nuscenes(bb3d) -> np.ndarray:
+    """
+    Returns the bounding box center.
+    """
+
+    x_center = np.sum(bb3d[0,:]) / 8
+    y_center = np.sum(bb3d[1,:]) / 8
+    z_center = np.sum(bb3d[2,:]) / 8
+    return [x_center,y_center,z_center]
