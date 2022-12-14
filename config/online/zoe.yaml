@@ -15,12 +15,12 @@ max_prediction_num: 12
 max_prediction_num_for_new_object: 4
 
 # detection score threshold
-input_score: 0
-init_score: 0.01
-update_score: 0
+input_score: 0.45 #min threshold of obj sent to tracker
+init_score: 0.45 #min threshold for starting new trajectory
+update_score: 0.3 #min threshold for associating obj with existing trajectory
 post_score: 0
 
 # tracking latency (s)
 # -1: global tracking
 # 0.->500: online or near online tracking
-latency: 500
+latency: 250
