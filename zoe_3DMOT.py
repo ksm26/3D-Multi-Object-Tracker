@@ -140,7 +140,7 @@ def save_seq(tracker,
         box2d = view_points(corners_camera[:3, :], camera_intrinsic, normalize=True)
 
         box_center = bb3d_centres_nuscenes(corners_ego)
-        box_angle = box_template[0][6]
+        box_angle = box_template[0][6]-1.57
 
         # print('%d %d %s -1 -1 -10 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
         #       % (i, ob_id, tracking_type, box2d[0][0], box2d[0][1], box2d[0][2],
