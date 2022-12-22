@@ -11,7 +11,7 @@ prediction_score_decay: 0.03
 LiDAR_scanning_frequency: 10
 
 # max prediction number of state function
-max_prediction_num: 12
+max_prediction_num: 120
 max_prediction_num_for_new_object: 4
 
 # detection score threshold
@@ -23,4 +23,4 @@ post_score: 0
 # tracking latency (s)
 # -1: global tracking
 # 0.->500: online or near online tracking
-latency: 250
+latency: 50

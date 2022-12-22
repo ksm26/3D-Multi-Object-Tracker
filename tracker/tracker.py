@@ -28,7 +28,8 @@ class Tracker3D:
         self.active_trajectories = {}
         self.dead_trajectories = {}
 
-    def tracking(self,bbs_3D = None,
+    def tracking(self,
+                 bbs_3D = None,
                  features = None,
                  scores = None,
                  pose = None,

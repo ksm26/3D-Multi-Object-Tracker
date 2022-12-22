@@ -75,7 +75,8 @@ class Track_seq():
         objects = objects[mask]
         det_scores = det_scores[mask]
 
-        self.tracker.tracking(objects[:,:7],
+        bbs, ids = self.tracker.tracking(
+                             objects[:,:7],
                              features=None,
                              scores=det_scores,
                              pose=None,
@@ -83,7 +84,7 @@ class Track_seq():
 
         print(f'length of dead trajectories:{self.tracker.dead_trajectories.__len__()}')
         print(f'length of active trajectories:{self.tracker.active_trajectories.__len__()}')
-        return self.tracker
+        return self.tracker, ids
 
 def save_seq(tracker,
                  config,
@@ -99,7 +100,7 @@ def save_seq(tracker,
     """
 
     tracking_type = config.tracking_type
-    print(tracking_type)
+    # print(tracking_type)
     s =time.time()
     tracks = tracker.post_processing(config)
     proc_time = s-time.time()
@@ -134,17 +135,15 @@ def save_seq(tracker,
         box_template[0,3:7]=updated_state[0,9:13]
 
         # global to lidar
-        box = bb3d_corners_nuscenes(list(box_template[0, :]))
+        box = bb3d_corners_nuscenes(list(box_template[0, :])) # extract corners based on x,y,z,l,b,h TODO change angle from ego frame
         corners_ego = np.dot(world_2_ego, box)
         corners_camera = np.dot(Ego2Cam, corners_ego)
         box2d = view_points(corners_camera[:3, :], camera_intrinsic, normalize=True)
 
-        box_center = bb3d_centres_nuscenes(corners_ego)
-        box_angle = box_template[0][6]-1.57
+        box_center = bb3d_centres_nuscenes(corners_ego) # in ego vehicle frame 
 
-        # print('%d %d %s -1 -1 -10 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
-        #       % (i, ob_id, tracking_type, box2d[0][0], box2d[0][1], box2d[0][2],
-        #          box2d[0][3], box_center[0], box_center[1], box_center[2], box_template[0][3], box_template[0][4], box_template[0][5], box_angle, score), file=f)
+        box_angle = box_template[0][6]-1.57 # change here for angle TODO, now it is in ego frame
+        # box_angle = nuscenes_data['pose_angle']-box_template[0][6] # example from nuscences3dmot for box angle 
 
         track_obj.append([i, ob_id, tracking_type, box2d[0][0], box2d[0][1], box2d[0][2],
         box2d[0][3], box_center[0], box_center[1], box_center[2], box_template[0][3], box_template[0][4],
